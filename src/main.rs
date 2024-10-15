@@ -5,12 +5,8 @@ use crate::config::*;
 
 use json::parse;
 
-fn main() {
-
-    struct File {
-        at: String,
-        contents: String,
-    }
+#[async_std::main]
+async fn main() -> tide::Result<()> {
 
     let config: Option<String> = file_contents(CONFIG_FILE_NAME);
     if config == None {
@@ -25,7 +21,11 @@ fn main() {
     }
 
     if ! config["listens"].is_array() {
-        panic!("config.arrays must be an array");
+        panic!("config.listens must be an array");
+    }
+
+    if config["listens"].len() == 0 {
+        panic!("configs.listens cannot be empty");
     }
 
     for i in 0..config["listens"].len() {
@@ -41,22 +41,19 @@ fn main() {
         }
     }
 
-    let mut files: Vec<File> = Vec::with_capacity(config["listens"].len());
+    let host: String = config["host"].to_string();
+
+    let mut app = tide::new();
     for i in 0..config["listens"].len() {
         let at: String = config["listens"][i]["at"].to_string();
         let path: String = config["listens"][i]["path"].to_string();
 
-        let contents: Option<String> = file_contents(&path);
-        if contents == None {
-            panic!("Failed to read file \"{}\"", path);
-        }
-        let contents: String = contents.unwrap();
-
-        let file: File = File {
-            at: at,
-            contents: contents,
-        };
-
-        files.push(file);
+        app.at(&at).serve_file(&path);
+        println!("Serving {} at {}", path, at);
     }
+
+    println!("Running at {}", host);
+    app.listen(host).await?;
+
+    Ok(())
 }
